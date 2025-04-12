@@ -1,4 +1,4 @@
-# NIO Project
+# Java nio samples
 This project contains NIO test code and  tests
 
 ## How to run
