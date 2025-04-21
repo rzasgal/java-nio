@@ -11,8 +11,9 @@ import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousSocketChannel;
+import java.nio.channels.CompletionHandler;
 import java.nio.channels.FileChannel;
-import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
@@ -31,6 +32,7 @@ public class NioExample {
   private HttpClient client;
   private Selector selector;
   private static final String CRLF = "\r\n";
+
 
   public NioExample(int threadCount) throws IOException {
     setupHttpClient(threadCount);
@@ -139,6 +141,60 @@ public class NioExample {
     readableChannel.close();
     return response.toString();
   }
+
+  public void sendRequestUsingAsynchronousSocketChannel(String host, int port, String path) throws IOException {
+    AsynchronousSocketChannel asynchronousSocketChannel = AsynchronousSocketChannel.open();
+    asynchronousSocketChannel.connect(new InetSocketAddress(InetAddress.getByName(host), port), null, new CompletionHandler<Void, Void>(){
+      @Override
+      public void completed(Void result, Void attachment) {
+        asynchronousSocketChannel.write(getMessage(host, path), null, new CompletionHandler<Integer, Void>() {
+          @Override
+          public void completed(Integer result, Void attachment) {
+            ByteBuffer buf = ByteBuffer.allocate(10240);
+            asynchronousSocketChannel.read(buf, null, new CompletionHandler<Integer, ByteBuffer>() {
+
+              @Override
+              public void completed(Integer result, ByteBuffer buffer) {
+                if(result == -1) {
+                  System.out.println("\nConnection closed by server.");
+                  client.close();
+                  return;
+                }
+                buf.flip();
+                System.out.println(UTF_8.decode(buf));
+                buf.clear();
+                asynchronousSocketChannel.read(buf, null, this);
+              }
+
+              @Override
+              public void failed(Throwable exc, ByteBuffer buffer) {
+                System.out.println("something went wrong");
+              }
+            });
+          }
+
+          @Override
+          public void failed(Throwable exc, Void attachment) {
+            System.out.println("something went wrong");
+          }
+        });
+      }
+
+      @Override
+      public void failed(Throwable exc, Void attachment) {
+        System.err.println("Connection failed: " + exc.getMessage());
+      }
+    });
+  }
+
+  private ByteBuffer getMessage(String host, String path) {
+    String request = "GET " + path + " HTTP/1.1" + CRLF
+        + "Host: " + host + CRLF
+        + "Connection: close" + CRLF
+        + CRLF;
+    return UTF_8.encode(request);
+  }
+
 
   private void createChannel(String host, int port) throws IOException {
     SocketChannel socketChannel = SocketChannel.open();

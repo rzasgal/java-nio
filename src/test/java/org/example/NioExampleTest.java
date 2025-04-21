@@ -10,7 +10,13 @@ import org.junit.jupiter.api.Test;
 class NioExampleTest {
 
   @Test
-  void testSendMultipleRequests() throws IOException {
+  void testReadFile() throws IOException, URISyntaxException {
+    NioExample nioExample = new NioExample(1);
+    System.out.println(nioExample.readFromFile("example.txt"));
+  }
+
+  @Test
+  void testSendRequstWithHttpClient() throws IOException {
     NioExample nioExample = new NioExample(2);
     String serverUrl = "http://localhost:7000";
     List<CompletableFuture<Void>> requests = new ArrayList<>();
@@ -22,12 +28,6 @@ class NioExampleTest {
       requests.add(nioExample.sendRequest(requestUrl));
     }
     CompletableFuture.allOf(requests.toArray(new CompletableFuture[0])).join();
-  }
-
-  @Test
-  void testReadFile() throws IOException, URISyntaxException {
-    NioExample nioExample = new NioExample(1);
-    System.out.println(nioExample.readFromFile("example.txt"));
   }
 
   @Test
@@ -47,4 +47,18 @@ class NioExampleTest {
     nioExample.getSelector().close();
   }
 
+  @Test
+  void testSendRequestUsingAsynchronousSocketChannel()
+      throws IOException, InterruptedException {
+    String host = "localhost";
+    NioExample nioExample = new NioExample(1, host, 7000);
+    for (int i = 0; i < 10; i++) {
+      String requestUrl =  "/?id=" + i;
+      if (i != 9) {
+        requestUrl += "&wait=" + 5000;
+      }
+      nioExample.sendRequestUsingAsynchronousSocketChannel(host, 7000,requestUrl);
+    }
+    Thread.sleep(10000);
+  }
 }
